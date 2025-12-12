@@ -48,5 +48,19 @@
             }
         }
     </script>
+    <script>
+    if ('speechSynthesis' in window) {
+        const flashMessages = document.getElementById('flash-messages');
+        if (flashMessages && flashMessages.children.length > 0) {
+            const messageText = flashMessages.children[0].textContent.trim();
+            
+            // This is the core logic: checking the text for failure keywords
+            if (messageText.includes("Hmm...") || messageText.includes("Not quite") || messageText.includes("failed")) {
+                const msg = new SpeechSynthesisUtterance(messageText);
+                window.speechSynthesis.speak(msg);
+            }
+        }
+    }
+</script>
 </body>
 </html>
