@@ -1,1 +1,31 @@
-
+<body>
+    <h2>Login</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes" id="flash-messages">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    
+    <a href="{{ url_for('index') }}">Home</a>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <script>
+        if ('speechSynthesis' in window) {
+            const flashMessages = document.getElementById('flash-messages');
+            if (flashMessages && flashMessages.children.length > 0) {
+                const messageText = flashMessages.children[0].textContent.trim();
+                
+                // Only speak if it's likely a failure message (and not a "Signup successful" message)
+                if (messageText.includes("Hmm...") || messageText.includes("Not quite") || messageText.includes("failed")) {
+                    const msg = new SpeechSynthesisUtterance(messageText);
+                    window.speechSynthesis.speak(msg);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
