@@ -18,17 +18,18 @@
     
     <form method="POST" enctype="multipart/form-data" id="signup-form">
         <label for="username">Username:</label>
-        <input type="text" name="username" required><br><br>
-        
-        <p>Record your passphrase (e.g., "My voice unlocks the app"):</p>
-        
-        <button type="button" class="record-btn" data-form="signup-form" disabled>Start Recording</button>
-        
-        <div class="status-message">Click Start Recording to begin.</div>
-        <audio class="audio-playback" controls style="display:block; margin-top: 10px;"></audio>
-        <br>
-        
-        <input type="submit" value="Sign Up and Save Voice">
+    <input type="text" name="username" required><br><br>
+    
+    <p>Record your passphrase (e.g., "My voice unlocks the app"):</p>
+    
+    <button type="button" class="record-btn" data-form="[FORM_ID]" disabled>Start Recording</button>
+    
+    <div class="status-message">Click Start Recording to begin.</div>
+    
+    <audio class="audio-playback" controls style="display:none; margin-top: 10px;"></audio>
+    <br>
+    
+    <input type="submit" value="Sign Up and Save Voice" disabled>
     </form>
     <br>
     <a href="{{ url_for('index') }}">Home</a>
