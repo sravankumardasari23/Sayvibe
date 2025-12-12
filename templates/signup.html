@@ -1,1 +1,38 @@
-
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up - Voice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h2>Sign Up</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    
+    <form method="POST" enctype="multipart/form-data" id="signup-form">
+        <label for="username">Username:</label>
+        <input type="text" name="username" required><br><br>
+        
+        <p>Record your passphrase (e.g., "My voice unlocks the app"):</p>
+        
+        <button type="button" class="record-btn" data-form="signup-form" disabled>Start Recording</button>
+        <button type="button" class="stop-btn" data-form="signup-form" disabled>Stop Recording</button>
+        
+        <div class="status-message">Click Start Recording to begin.</div>
+        <audio class="audio-playback" controls style="display:block; margin-top: 10px;"></audio>
+        <br>
+        
+        <input type="submit" value="Sign Up and Save Voice">
+    </form>
+    <br>
+    <a href="{{ url_for('index') }}">Home</a>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
