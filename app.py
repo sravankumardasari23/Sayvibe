@@ -44,15 +44,21 @@ PHRASES_FAIL = [
 ]
 
 # Initialize DB (Same as before)
+# In app.py
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
                  username TEXT PRIMARY KEY,
-                 voice_file TEXT)""")
+                 voice_file TEXT,
+                 tool TEXT,       -- New Survey Column
+                 trend TEXT,      -- New Survey Column
+                 color TEXT,      -- New Survey Column
+                 recharge TEXT    -- New Survey Column
+                 )""")
     conn.commit()
     conn.close()
-
+    
 init_db()
 
 # Feature extraction and matching functions (Same as before)
