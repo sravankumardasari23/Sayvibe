@@ -1,5 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - Voice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
 <body>
     <h2>Login</h2>
+    
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul class="flashes" id="flash-messages">
@@ -10,6 +17,21 @@
       {% endif %}
     {% endwith %}
     
+    <form method="POST" enctype="multipart/form-data" id="login-form">
+        <label for="username">Username:</label>
+        <input type="text" name="username" required><br><br>
+        
+        <p>Speak your saved passphrase now:</p>
+        
+        <button type="button" class="record-btn" data-form="login-form" disabled>Start Recording</button>
+        <button type="button" class="stop-btn" data-form="login-form" disabled>Stop Recording</button>
+        
+        <div class="status-message">Click Start Recording to begin verification.</div>
+        <audio class="audio-playback" controls style="display:block; margin-top: 10px;"></audio>
+        <br>
+        
+        <input type="submit" value="Login">
+    </form>
     <a href="{{ url_for('index') }}">Home</a>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     
