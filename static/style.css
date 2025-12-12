@@ -1,1 +1,32 @@
-
+body {
+    font-family: sans-serif;
+    margin: 20px;
+    line-height: 1.6;
+}
+.record-btn, .stop-btn {
+    padding: 10px 15px;
+    margin: 5px;
+    cursor: pointer;
+}
+.stop-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+}
+.record-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+}
+.status-message {
+    margin: 10px 0;
+    font-weight: bold;
+}
+.flashes {
+    list-style-type: none;
+    padding: 0;
+    color: #007bff;
+    background-color: #e9f5ff;
+    padding: 10px;
+    border-radius: 5px;
+}
