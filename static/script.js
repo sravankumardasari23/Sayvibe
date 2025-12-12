@@ -1,13 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // We only need the Record button now. The Stop button is functionally replaced by the timer.
     const recordButtons = document.querySelectorAll('.record-btn');
-    const stopButtons = document.querySelectorAll('.stop-btn');
-    const forms = document.querySelectorAll('form'); 
+    const forms = document.querySelectorAll('form');
     
     let mediaRecorder;
     let audioChunks = [];
     let stream;
     let currentFormId;
+    let timerTimeout; // Used to stop recording after 5 seconds
+    let secondsElapsed = 0;
     let timerInterval;
+
+    const RECORD_DURATION = 5; // Set the recording duration to 5 seconds
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         alert('Your browser does not support microphone access.');
@@ -19,30 +23,55 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(s => {
             stream = s;
             recordButtons.forEach(btn => btn.disabled = false);
-            // Hide the redundant stop buttons initially
-            stopButtons.forEach(btn => btn.style.display = 'none');
         })
         .catch(err => {
             alert('Microphone access denied. Please enable it to use this feature.');
             console.error(err);
         });
-
+        
     // Helper function to update the visible timer
     function updateTimer(statusDiv) {
-        let seconds = 0;
+        secondsElapsed = 0;
+        statusDiv.textContent = `Recording... Duration: 0:00 / 0:${RECORD_DURATION}`;
+        
         timerInterval = setInterval(() => {
-            seconds++;
-            const s = String(seconds % 60).padStart(2, '0');
-            const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-            statusDiv.textContent = `Recording... Duration: ${m}:${s}`;
+            secondsElapsed++;
+            const s = String(secondsElapsed % 60).padStart(2, '0');
+            statusDiv.textContent = `Recording... Duration: 0:${s} / 0:${RECORD_DURATION}`;
         }, 1000);
     }
 
-    function startRecording(button, statusDiv) {
+    // Function to handle the recorder stopping (manually or by timer)
+    function handleStop(formElement, statusDiv) {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            clearInterval(timerInterval);
+            clearTimeout(timerTimeout);
+            mediaRecorder.stop();
+            
+            // Re-enable the form submit button and disable recording button
+            formElement.querySelector('input[type="submit"]').disabled = false;
+            formElement.querySelector('.record-btn').disabled = false;
+            
+            statusDiv.textContent = 'Recording stopped. Review your audio before saving.';
+        }
+    }
+
+    function startRecording(button) {
+        // Find the elements for this form
+        const formElement = button.closest('form');
+        const statusDiv = formElement.querySelector('.status-message');
+        const audioPlayback = formElement.querySelector('.audio-playback');
+
         // Reset state
         audioChunks = [];
-        currentFormId = button.dataset.form;
+        currentFormId = formElement.id;
+        audioPlayback.style.display = 'none';
+        audioPlayback.removeAttribute('src');
         
+        // Disable form submission and re-enable the recording button
+        formElement.querySelector('input[type="submit"]').disabled = true;
+        button.disabled = true;
+
         // Start MediaRecorder
         const options = { mimeType: 'audio/webm' };
         mediaRecorder = new MediaRecorder(stream, options);
@@ -53,82 +82,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
         mediaRecorder.onstop = () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioUrl = URL.createObjectURL(audioBlob);
             
-            // Playback element is static/hidden in the new flow, but we keep the logic to create the Blob
+            // Enable playback for review
+            audioPlayback.src = audioUrl;
+            audioPlayback.style.display = 'block';
             
             // Attach the Blob to the form as a hidden file input for submission
-            const formElement = document.getElementById(currentFormId);
-            const existingInput = formElement.querySelector('input[name="audio"]');
-            if (existingInput) {
-                formElement.removeChild(existingInput);
-            }
-
-            const audioInput = document.createElement('input');
-            audioInput.type = 'hidden';
-            audioInput.name = 'audio';
-            
-            // Convert the Blob into a File object
-            const file = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            audioInput.files = dataTransfer.files;
-
-            formElement.appendChild(audioInput);
-            
-            statusDiv.textContent = 'Recording complete. Submitting...';
+            attachAudioToForm(formElement, audioBlob);
         };
 
         mediaRecorder.start();
         
-        // Start the timer and update the status message
+        // Start the timer
         updateTimer(statusDiv);
-        button.disabled = true;
         
-        // Hide playback controls during recording for cleaner UI
-        document.querySelector(`#${currentFormId} .audio-playback`).style.display = 'none';
+        // 🛑 Set timeout to automatically stop after 5 seconds 🛑
+        timerTimeout = setTimeout(() => {
+            handleStop(formElement, statusDiv);
+            statusDiv.textContent = 'Recording complete (5 seconds). Review your audio.';
+        }, RECORD_DURATION * 1000); // 5000 milliseconds
     }
     
-    // --- NEW: Function to stop recording and prepare for submission ---
-    function stopAndPrepareSubmission() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            clearInterval(timerInterval);
-            mediaRecorder.stop();
+    // Function to create the hidden input field with the recorded audio file
+    function attachAudioToForm(formElement, audioBlob) {
+        // Remove old audio input if it exists
+        const existingInput = formElement.querySelector('input[name="audio"]');
+        if (existingInput) {
+            formElement.removeChild(existingInput);
         }
-        // Crucially, the form submission should be handled by the event listener below
+
+        const audioInput = document.createElement('input');
+        audioInput.type = 'hidden';
+        audioInput.name = 'audio';
+        
+        // Convert the Blob into a File object (needed for Flask request.files)
+        const file = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        audioInput.files = dataTransfer.files;
+
+        formElement.appendChild(audioInput);
     }
 
     // 2. Attach Start Recording to the button
     recordButtons.forEach(btn => {
         btn.addEventListener('click', () => {
-            const formId = btn.dataset.form;
-            const statusDiv = document.querySelector(`#${formId} .status-message`);
-            startRecording(btn, statusDiv);
-            
-            // Change button text to reflect new state
-            btn.textContent = 'Recording in Progress...';
-            btn.style.backgroundColor = '#cc2b1e'; // Change color to red to indicate recording
+            startRecording(btn);
         });
     });
 
-    // 3. Attach Stop/Submission Logic to the Form's Submit Event
+    // 3. Form Submission Logic
     forms.forEach(form => {
         form.addEventListener('submit', (e) => {
-            // Check if recording is active. If so, stop it before submission.
-            stopAndPrepareSubmission();
+            const audioInput = form.querySelector('input[name="audio"]');
             
-            // The submission will proceed automatically after mediaRecorder.onstop runs,
-            // because the mediaRecorder.onstop function finishes synchronously.
-            // We use setTimeout to ensure the audio blob is attached before the submission completes.
-            
-            // Delay the form submission very slightly to allow mediaRecorder.onstop to finish
-            e.preventDefault();
-            setTimeout(() => {
-                form.submit();
-            }, 50); // Small delay to guarantee the 'audio' file is attached
+            // Check if recording is still running OR if no audio file is attached
+            if ((mediaRecorder && mediaRecorder.state === 'recording') || !audioInput || !audioInput.files.length) {
+                
+                // If recording is running, stop it and attach the file
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    handleStop(form, form.querySelector('.status-message'));
+                }
+                
+                // Prevent submission until file is attached or user confirms
+                e.preventDefault(); 
+                
+                // If the file is still missing after stop, alert the user and wait 
+                // for the file attachment (mediaRecorder.onstop).
+                
+                // We submit the form only after a short delay to guarantee file attachment
+                if (!audioInput || !audioInput.files.length) {
+                     setTimeout(() => {
+                        // Check again after the wait
+                        if (form.querySelector('input[name="audio"]') && form.querySelector('input[name="audio"]').files.length > 0) {
+                             form.submit();
+                        } else {
+                            // If still missing (a rare browser error)
+                            alert("Audio file failed to attach. Please try recording again.");
+                        }
+                    }, 500); // Wait 500ms for onstop to complete
+                }
+
+            }
+            // ELSE: Audio is already attached (from a previous recording) and ready to go.
         });
     });
-    
-    // 4. Remove all Stop Button Listeners (since they are hidden/removed)
-    // The previous stop button logic is now completely replaced by the form submit listener.
-
 });
