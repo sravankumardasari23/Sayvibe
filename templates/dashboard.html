@@ -3,53 +3,122 @@
 <head>
     <title>Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th, .results-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .results-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
 </head>
 <body>
     <h1>Welcome, {{ username }}</h1>
     
-    <div id="voice-message-container">
-        <p class="flashes">{{ login_message }}</p>
-    </div>
+    <p class="flashes">{{ login_message }}</p>
 
-    <p>You are logged in using your voice!</p>
-    
-    <div style="border: 1px solid #ccc; padding: 15px; margin-top: 20px;">
-        <h3>Your Fun Voice Stat of the Day!</h3>
-        <p>Your "Unique Tone Frequency" score is: **98.7** out of 100! (Totally scientific! 😉)</p>
+    <div style="border: 2px solid #4CAF50; padding: 15px; margin-bottom: 30px; border-radius: 8px; background-color: #e8f5e9;">
+        <h3>Your Voiceprint Analytics Unlocked!</h3>
+        <p>Your "Unique Tone Frequency" score is: **98.7** out of 100!</p>
         <p>You have unlocked **Emoji Greeting #5** 🎉😎🌟</p>
     </div>
 
-    <a href="{{ url_for('logout') }}" style="margin-top: 20px; display: inline-block;">Logout</a>
+    {% if not survey_complete %}
+        
+        <h2>Unlock More Insights: Quick Voice Survey</h2>
+        <form method="POST" action="{{ url_for('submit_survey') }}">
+            
+            <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc;">
+                <legend>1. Preferred WFH Tool?</legend>
+                <input type="radio" id="tool_zoom" name="tool" value="Zoom" required> <label for="tool_zoom">Zoom</label><br>
+                <input type="radio" id="tool_slack" name="tool" value="Slack"> <label for="tool_slack">Slack</label><br>
+                <input type="radio" id="tool_email" name="tool" value="Email"> <label for="tool_email">Email</label>
+            </fieldset>
+
+            <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc;">
+                <legend>2. Which tech trend excites your voice the most?</legend>
+                <input type="radio" id="trend_ai" name="trend" value="AI/ML" required> <label for="trend_ai">AI/ML</label><br>
+                <input type="radio" id="trend_web3" name="trend" value="Web3/Blockchain"> <label for="trend_web3">Web3/Blockchain</label><br>
+                <input type="radio" id="trend_metaverse" name="trend" value="Metaverse"> <label for="trend_metaverse">Metaverse</label>
+            </fieldset>
+            
+            <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc;">
+                <legend>3. If your voice were a color, what would it be?</legend>
+                <input type="radio" id="color_blue" name="color" value="Blue (Calm)" required> <label for="color_blue">Blue (Calm)</label><br>
+                <input type="radio" id="color_red" name="color" value="Red (Bold)"> <label for="color_red">Red (Bold)</label><br>
+                <input type="radio" id="color_green" name="color" value="Green (Optimistic)"> <label for="color_green">Green (Optimistic)</label>
+            </fieldset>
+
+            <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc;">
+                <legend>4. What helps your voice recharge?</legend>
+                <input type="radio" id="recharge_coffee" name="recharge" value="Coffee/Tea" required> <label for="recharge_coffee">Coffee/Tea</label><br>
+                <input type="radio" id="recharge_music" name="recharge" value="Music/Podcasts"> <label for="recharge_music">Music/Podcasts</label><br>
+                <input type="radio" id="recharge_silence" name="recharge" value="Silence/Meditation"> <label for="recharge_silence">Silence/Meditation</label>
+            </fieldset>
+            
+            <input type="submit" value="Submit My Voice Insights" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer;">
+        </form>
+
+    {% else %}
+    
+        <h2>✅ Insights Complete! View Your Voice Profile:</h2>
+        
+        <table class="results-table">
+            <tr><th>Question</th><th>Your Answer</th><th>Voice Insight</th></tr>
+            <tr>
+                <td>1. Preferred WFH Tool</td>
+                <td>{{ user_survey.tool }}</td>
+                <td>Your voice is most comfortable in a collaborative digital space.</td>
+            </tr>
+            <tr>
+                <td>2. Tech Trend Excitement</td>
+                <td>{{ user_survey.trend }}</td>
+                <td>You speak the language of the future—your voice profile is highly innovative.</td>
+            </tr>
+            <tr>
+                <td>3. Voice Color</td>
+                <td>{{ user_survey.color }}</td>
+                <td>Your voice naturally carries an aura of **{{ user_survey.color }}**.</td>
+            </tr>
+            <tr>
+                <td>4. Voice Recharge</td>
+                <td>{{ user_survey.recharge }}</td>
+                <td>To maintain optimal voice energy, ensure you get enough **{{ user_survey.recharge }}**.</td>
+            </tr>
+        </table>
+        <p style="margin-top: 20px;">*These fun insights are generated by our proprietary Voice Vibe Algorithm™.</p>
+        
+    {% endif %}
+    
+    <hr>
+    <a href="{{ url_for('logout') }}">Logout</a>
 
     <script>
-        // --- Client-Side Text-to-Speech (TTS) ---
         function speakMessage(text) {
             if ('speechSynthesis' in window) {
-                // Remove emojis and artifacts for cleaner speech
                 const cleanText = text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\S+:\/\/\S+|\(.*\)|\[.*\]/g, '').trim();
-                
-                const msg = new SpeechSynthesisUtterance();
-                msg.text = cleanText;
-                msg.volume = 1; // 0 to 1
-                msg.rate = 1;   // 0.1 to 10
-                msg.pitch = 1;  // 0 to 2
-                
-                // You can choose a specific voice if you want a fun personality
-                // window.speechSynthesis.getVoices().forEach(voice => {
-                //     if (voice.name === 'Alex') msg.voice = voice;
-                // });
-
+                const msg = new SpeechSynthesisUtterance(cleanText);
                 window.speechSynthesis.speak(msg);
-            } else {
-                console.warn('Text-to-speech not supported in this browser.');
             }
         }
-
-        // Get the message passed from the server and speak it
+        
+        // Check if there's a login message (only speak once after login)
         const messageToSpeak = document.querySelector('.flashes').textContent.trim();
-        if (messageToSpeak) {
+        if (messageToSpeak && !sessionStorage.getItem('spoken_login')) {
             speakMessage(messageToSpeak);
+            sessionStorage.setItem('spoken_login', 'true'); 
         }
+        // Clear flag when leaving dashboard
+        window.onbeforeunload = function() {
+            sessionStorage.removeItem('spoken_login');
+        };
     </script>
 </body>
 </html>
