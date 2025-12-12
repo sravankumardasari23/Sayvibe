@@ -1,22 +1,25 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import os
 import numpy as np
 import librosa
 import soundfile as sf
-import random # New import for phrase selection
+import random
 
+# --- FLASK SETUP & CONFIGURATION ---
 app = Flask(__name__)
-app.secret_key = "voice_secret_key"
+# IMPORTANT: Change this key to a complex, secret string in a production environment
+app.secret_key = "voice_secret_key" 
 
 UPLOAD_FOLDER = "uploads"
+# Ensure the uploads directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 DB_PATH = "database.db"
 
+
 # --- FUN PHRASES (For Success and Failure) ---
-# Expand these lists to 100-200 phrases each for max fun!
 PHRASES_SUCCESS = [
     "You sound perfect! Welcome aboard! 🎉",
     "Spot on! Voice verified and you're in! 😎",
@@ -43,34 +46,40 @@ PHRASES_FAIL = [
     "Intruder alert! Just kidding. Try the passphrase again.",
 ]
 
-# Initialize DB (Same as before)
-# In app.py
+
+# --- DATABASE INITIALIZATION ---
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # CRITICAL: Added the four survey columns (tool, trend, color, recharge)
     c.execute("""CREATE TABLE IF NOT EXISTS users (
                  username TEXT PRIMARY KEY,
                  voice_file TEXT,
-                 tool TEXT,       -- New Survey Column
-                 trend TEXT,      -- New Survey Column
-                 color TEXT,      -- New Survey Column
-                 recharge TEXT    -- New Survey Column
+                 tool TEXT,       
+                 trend TEXT,      
+                 color TEXT,      
+                 recharge TEXT
                  )""")
     conn.commit()
     conn.close()
-    
+
+# Initialize the database structure on startup
 init_db()
 
-# Feature extraction and matching functions (Same as before)
+
+# --- VOICE FEATURE EXTRACTION AND MATCHING ---
 def extract_features(file_path):
     if not os.path.exists(file_path):
         return None
     try:
+        # Load audio using librosa
         y, sr = librosa.load(file_path, sr=None)
+        # Extract MFCCs (13 coefficients)
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        # Return the mean of the MFCCs across all frames
         return np.mean(mfccs.T, axis=0)
     except Exception as e:
-        print(f"Error extracting features: {e}")
+        print(f"Error extracting features from {file_path}: {e}")
         return None
 
 def match_voice(file1, file2, threshold=0.4):
@@ -80,8 +89,13 @@ def match_voice(file1, file2, threshold=0.4):
     if f1 is None or f2 is None:
         return False
         
+    # Calculate Euclidean distance between the feature vectors
     dist = np.linalg.norm(f1 - f2)
+    # Match is successful if the distance is below the threshold
     return dist < threshold
+
+
+# --- FLASK ROUTES ---
 
 @app.route('/')
 def index():
@@ -89,37 +103,41 @@ def index():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # ... (Signup logic remains the same, except for redirecting to login with a basic flash) ...
     if request.method == 'POST':
         username = request.form.get('username')
         audio_blob = request.files.get('audio')
         
         if not username or not audio_blob:
-            flash("Please provide username and a voice recording.")
+            flash(random.choice(PHRASES_FAIL) + " (Missing input)")
             return redirect(url_for('signup'))
         
+        # 1. Save the received webm audio blob temporarily
         temp_audio_path = os.path.join(app.config['UPLOAD_FOLDER'], username + "_temp.webm")
         audio_blob.save(temp_audio_path)
         
         final_wav_path = os.path.join(app.config['UPLOAD_FOLDER'], username + ".wav")
+        
         try:
+            # 2. Convert webm to wav (required by librosa for stable feature extraction)
             y, sr = librosa.load(temp_audio_path, sr=None)
             sf.write(final_wav_path, y, sr)
             
+            # 3. Save user info and voice file path to DB
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO users (username, voice_file) VALUES (?,?)", (username, final_wav_path))
             conn.commit()
             conn.close()
             
+            # 4. Cleanup temporary file
             os.remove(temp_audio_path)
             
-            # Simple success message for signup
             flash("Signup successful! Try logging in now.")
             return redirect(url_for('login'))
         
         except Exception as e:
-            flash(f"Error processing audio: {e}. Try again.")
+            flash(f"Error processing audio: Try again! ({e})")
+            # Cleanup on failure
             if os.path.exists(temp_audio_path): os.remove(temp_audio_path)
             if os.path.exists(final_wav_path): os.remove(final_wav_path)
             return redirect(url_for('signup'))
@@ -137,6 +155,7 @@ def login():
             flash(random.choice(PHRASES_FAIL) + " (Missing input)")
             return redirect(url_for('login'))
 
+        # 1. Fetch saved voiceprint file path
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT voice_file FROM users WHERE username=?", (username,))
@@ -150,19 +169,22 @@ def login():
             audio_blob.save(temp_path_webm)
             
             try:
+                # 2. Convert login audio to wav for matching
                 y, sr = librosa.load(temp_path_webm, sr=None)
                 sf.write(temp_path_wav, y, sr)
                 
+                # 3. Perform voice verification
                 if match_voice(saved_voice_path, temp_path_wav):
                     session['username'] = username
-                    # --- SUCCESS FEEDBACK ---
                     feedback_message = random.choice(PHRASES_SUCCESS)
                     flash(feedback_message)
-                    os.remove(temp_path_webm)
-                    os.remove(temp_path_wav)
+                    
+                    # Cleanup temp files
+                    if os.path.exists(temp_path_webm): os.remove(temp_path_webm)
+                    if os.path.exists(temp_path_wav): os.remove(temp_path_wav)
+
                     return redirect(url_for('dashboard'))
                 else:
-                    # --- FAILURE FEEDBACK ---
                     feedback_message = random.choice(PHRASES_FAIL)
                     flash(feedback_message)
                 
@@ -170,7 +192,7 @@ def login():
                 feedback_message = f"Error processing audio: Try again! ({e})"
                 flash(feedback_message)
             
-            # Cleanup
+            # Final cleanup
             if os.path.exists(temp_path_webm): os.remove(temp_path_webm)
             if os.path.exists(temp_path_wav): os.remove(temp_path_wav)
             
@@ -182,15 +204,6 @@ def login():
         
     return render_template('login.html')
 
-@app.route('/dashboard')
-def dashboard():
-    # Pass the last flashed message to the dashboard for speaking
-    flashed_messages = session.get('_flashes', [])
-    last_message = flashed_messages[-1][1] if flashed_messages and flashed_messages[-1][0] == 'message' else ""
-    return render_template('dashboard.html', username=session['username'], login_message=last_message)
-    # In app.py
-@app.route('/submit_survey', methods=['POST'])
-# In app.py
 @app.route('/submit_survey', methods=['POST'])
 def submit_survey():
     if 'username' not in session:
@@ -203,11 +216,11 @@ def submit_survey():
     tool = request.form.get('tool')
     trend = request.form.get('trend')
     color = request.form.get('color')
-    recharge = request.form.get('recharge') # New
-    
+    recharge = request.form.get('recharge') 
+
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # Update the user's row with the survey answers
+    # CRITICAL FIX APPLIED: Ensure the variable list matches the placeholders
     c.execute("""UPDATE users SET tool=?, trend=?, color=?, recharge=?
                  WHERE username=?""", 
               (tool, trend, color, recharge, username))
@@ -217,7 +230,7 @@ def submit_survey():
     flash("Thank you for sharing your insights! Your voice data is now complete.")
     return redirect(url_for('dashboard'))
 
-# Update the dashboard route to fetch survey results
+
 @app.route('/dashboard')
 def dashboard():
     if 'username' not in session:
@@ -232,22 +245,19 @@ def dashboard():
     # 2. Fetch survey results
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Fetch all four survey columns
     c.execute("SELECT tool, trend, color, recharge FROM users WHERE username=?", (username,))
     results = c.fetchone()
     conn.close()
     
-    # Check if survey has been completed
-    if results and results[0]:
-        survey_complete = True
-        user_survey = {
-            'tool': results[0],
-            'trend': results[1],
-            'color': results[2],
-            'recharge': results[3]
-        }
-    else:
-        survey_complete = False
-        user_survey = None
+    # Check if survey has been completed (if the first column is not null)
+    survey_complete = bool(results and results[0])
+    user_survey = {
+        'tool': results[0],
+        'trend': results[1],
+        'color': results[2],
+        'recharge': results[3]
+    } if survey_complete else None
     
     return render_template('dashboard.html', 
                            username=username, 
@@ -255,13 +265,16 @@ def dashboard():
                            survey_complete=survey_complete,
                            user_survey=user_survey)
 
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
     flash("Logged out. We hope your voice rests well!")
     return redirect(url_for('index'))
 
+
+# --- APPLICATION RUNNER (For Heroku Deployment) ---
 if __name__ == '__main__':
-    # Get the PORT from Heroku's environment, or default to 5000 if running locally
+    # CRITICAL: This ensures the application binds to the port provided by Heroku
     port = int(os.environ.get("PORT", 5000)) 
     app.run(host='0.0.0.0', port=port)
