@@ -1,1 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Welcome, {{ username }}</h1>
+    
+    <div id="voice-message-container">
+        <p class="flashes">{{ login_message }}</p>
+    </div>
 
+    <p>You are logged in using your voice!</p>
+    
+    <div style="border: 1px solid #ccc; padding: 15px; margin-top: 20px;">
+        <h3>Your Fun Voice Stat of the Day!</h3>
+        <p>Your "Unique Tone Frequency" score is: **98.7** out of 100! (Totally scientific! 😉)</p>
+        <p>You have unlocked **Emoji Greeting #5** 🎉😎🌟</p>
+    </div>
+
+    <a href="{{ url_for('logout') }}" style="margin-top: 20px; display: inline-block;">Logout</a>
+
+    <script>
+        // --- Client-Side Text-to-Speech (TTS) ---
+        function speakMessage(text) {
+            if ('speechSynthesis' in window) {
+                // Remove emojis and artifacts for cleaner speech
+                const cleanText = text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\S+:\/\/\S+|\(.*\)|\[.*\]/g, '').trim();
+                
+                const msg = new SpeechSynthesisUtterance();
+                msg.text = cleanText;
+                msg.volume = 1; // 0 to 1
+                msg.rate = 1;   // 0.1 to 10
+                msg.pitch = 1;  // 0 to 2
+                
+                // You can choose a specific voice if you want a fun personality
+                // window.speechSynthesis.getVoices().forEach(voice => {
+                //     if (voice.name === 'Alex') msg.voice = voice;
+                // });
+
+                window.speechSynthesis.speak(msg);
+            } else {
+                console.warn('Text-to-speech not supported in this browser.');
+            }
+        }
+
+        // Get the message passed from the server and speak it
+        const messageToSpeak = document.querySelector('.flashes').textContent.trim();
+        if (messageToSpeak) {
+            speakMessage(messageToSpeak);
+        }
+    </script>
+</body>
+</html>
