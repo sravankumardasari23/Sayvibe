@@ -190,6 +190,8 @@ def dashboard():
     return render_template('dashboard.html', username=session['username'], login_message=last_message)
     # In app.py
 @app.route('/submit_survey', methods=['POST'])
+# In app.py
+@app.route('/submit_survey', methods=['POST'])
 def submit_survey():
     if 'username' not in session:
         flash("Please log in first.")
@@ -197,23 +199,61 @@ def submit_survey():
         
     username = session['username']
     
-    # Get answers from the submitted form
+    # Get answers from the submitted form (4 questions total)
     tool = request.form.get('tool')
     trend = request.form.get('trend')
     color = request.form.get('color')
-    recharge = request.form.get('recharge')
-
+    recharge = request.form.get('recharge') # New
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     # Update the user's row with the survey answers
     c.execute("""UPDATE users SET tool=?, trend=?, color=?, recharge=?
                  WHERE username=?""", 
-              (tool, trend, color, color, username))
+              (tool, trend, color, recharge, username))
     conn.commit()
     conn.close()
     
     flash("Thank you for sharing your insights! Your voice data is now complete.")
     return redirect(url_for('dashboard'))
+
+# Update the dashboard route to fetch survey results
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    
+    # 1. Get the latest flash message for TTS speaking
+    flashed_messages = session.get('_flashes', [])
+    last_message = flashed_messages[-1][1] if flashed_messages and flashed_messages[-1][0] == 'message' else ""
+
+    # 2. Fetch survey results
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT tool, trend, color, recharge FROM users WHERE username=?", (username,))
+    results = c.fetchone()
+    conn.close()
+    
+    # Check if survey has been completed
+    if results and results[0]:
+        survey_complete = True
+        user_survey = {
+            'tool': results[0],
+            'trend': results[1],
+            'color': results[2],
+            'recharge': results[3]
+        }
+    else:
+        survey_complete = False
+        user_survey = None
+    
+    return render_template('dashboard.html', 
+                           username=username, 
+                           login_message=last_message, 
+                           survey_complete=survey_complete,
+                           user_survey=user_survey)
 
 @app.route('/logout')
 def logout():
