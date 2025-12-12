@@ -188,6 +188,32 @@ def dashboard():
     flashed_messages = session.get('_flashes', [])
     last_message = flashed_messages[-1][1] if flashed_messages and flashed_messages[-1][0] == 'message' else ""
     return render_template('dashboard.html', username=session['username'], login_message=last_message)
+    # In app.py
+@app.route('/submit_survey', methods=['POST'])
+def submit_survey():
+    if 'username' not in session:
+        flash("Please log in first.")
+        return redirect(url_for('login'))
+        
+    username = session['username']
+    
+    # Get answers from the submitted form
+    tool = request.form.get('tool')
+    trend = request.form.get('trend')
+    color = request.form.get('color')
+    recharge = request.form.get('recharge')
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # Update the user's row with the survey answers
+    c.execute("""UPDATE users SET tool=?, trend=?, color=?, recharge=?
+                 WHERE username=?""", 
+              (tool, trend, color, color, username))
+    conn.commit()
+    conn.close()
+    
+    flash("Thank you for sharing your insights! Your voice data is now complete.")
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
